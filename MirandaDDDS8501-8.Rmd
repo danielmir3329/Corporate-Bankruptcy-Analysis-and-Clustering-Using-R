@@ -1,0 +1,1400 @@
+---
+title: "MirandaDDS8501-8"
+author: "Daniel Miranda Ruiz"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Upload Libraries
+
+```{r}
+library(ggplot2)            # Load ggplot2 library
+library(scales)             # Load scales library
+library(tidyverse)          # Load tidyverse library
+library(corrplot)     # Correlation visualization
+library(caret)        # Modeling prep
+library(psych)        # Descriptive statistics
+library(Amelia)
+library(dplyr)
+```
+
+## Get working directory
+
+```{r}
+getwd()
+```
+
+## See Files in directory
+
+```{r}
+list.files() # Look at Folder Files
+```
+
+## Load Dataset Bankrupcy companies
+
+```{r}
+american_banktupcy_dataset <- read.csv("american_bankruptcy.csv")
+```
+
+## Dataset Sample
+
+```{r}
+head(american_banktupcy_dataset)
+
+```
+
+## Variable Renaming for data undersatnding
+
+```{r}
+american_banktupcy_dataset <- american_banktupcy_dataset %>%
+  rename(
+    current_assets = X1,
+    cost_of_goods_sold = X2,
+    depreciation_amortization = X3,
+    ebitda = X4,
+    inventory = X5,
+    net_income = X6,
+    total_receivables = X7,
+    market_value = X8,
+    net_sales = X9,
+    total_assets = X10,
+    total_long_term_debt = X11,
+    ebit = X12,
+    gross_profit = X13,
+    total_current_liabilities = X14,
+    retained_earnings = X15,
+    total_revenue = X16,
+    total_liabilities = X17,
+    total_operating_expenses = X18
+  )
+```
+
+## Confirming rename
+
+```{r}
+colnames(american_banktupcy_dataset)
+```
+
+## Dataset Summary
+
+```{r}
+
+cat("\n\n===== DATA STRUCTURE =====================================================================\n\n")
+
+str(american_banktupcy_dataset)
+
+cat("\n\n===== DATA STRUCTURE =====================================================================\n\n")
+
+glimpse(american_banktupcy_dataset)
+
+cat("\n\n===== DATA STRUCTURE =====================================================================\n\n")
+
+sapply(american_banktupcy_dataset, class)
+
+cat("\n\n===== Summary Statistics =====================================================================\n\n")
+
+summary(american_banktupcy_dataset)
+
+cat("\n\n===== Summary Statistics =====================================================================\n\n")
+ 
+library(dplyr)
+library(tidyr)
+library(moments)
+
+numeric_data <- american_banktupcy_dataset %>%
+  select(where(is.numeric))
+
+summary_table <- numeric_data %>%
+  summarise(across(everything(),
+                   list(
+                     Mean = ~mean(., na.rm = TRUE),
+                     SD = ~sd(., na.rm = TRUE),
+                     Min = ~min(., na.rm = TRUE),
+                     Q1 = ~quantile(., 0.25, na.rm = TRUE),
+                     Median = ~median(., na.rm = TRUE),
+                     Q3 = ~quantile(., 0.75, na.rm = TRUE),
+                     Max = ~max(., na.rm = TRUE),
+                     Skew = ~skewness(., na.rm = TRUE),
+                     Kurtosis = ~kurtosis(., na.rm = TRUE)
+                   )))
+
+summary_table <- summary_table %>%
+  pivot_longer(everything(),
+               names_to = c("Variable", ".value"),
+               names_sep = "_") %>%
+  mutate(across(where(is.numeric), round, 2))
+
+summary_table
+```
+
+## Frequency Table for status_label
+
+```{r}
+table(american_banktupcy_dataset$status_label)
+
+library(dplyr)
+
+distribution_table <- american_banktupcy_dataset %>%
+  count(status_label) %>%
+  mutate(
+    Percent = round(n / sum(n) * 100, 2)
+  ) %>%
+  rename(
+    Status = status_label,
+    Total = n
+  )
+
+distribution_table
+```
+
+## Frequencies for year
+```{r}
+year_distribution <- american_banktupcy_dataset %>%
+  count(year) %>%
+  mutate(
+    Percent = round(n / sum(n) * 100, 2)
+  ) %>%
+  rename(
+    Year = year,
+    Total = n
+  )
+
+year_distribution
+```
+
+
+## Set status_label as factor
+
+```{r}
+american_banktupcy_dataset$status_label <- factor(american_banktupcy_dataset$status_label,
+                                     levels = c("alive", "failed"))
+```
+
+## Finding Missing Data
+
+```{r}
+colSums(is.na(american_banktupcy_dataset))
+```
+
+## Missingness Map of Data Identifying Missing Data by Row and Column Using Amelia
+
+```{r}
+missmap(american_banktupcy_dataset,
+  main   = "Missingness Map: Dataset",
+  legend = TRUE,
+  col    = c("red", "blue") 
+)
+```
+
+## CORRELATION MATRIX for outliers
+
+```{r}
+numeric_vars <- american_banktupcy_dataset %>%
+  select(where(is.numeric))
+
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+
+round(cor_matrix, 2)
+
+library(corrplot)
+
+corrplot(cor_matrix,
+         method = "color",
+         type = "upper",
+         order = "hclust",
+         tl.cex = 0.7,
+         tl.col = "black")
+```
+
+# SCATTERPLOT MATRIX
+
+```{r}
+
+library(tidyverse)
+
+american_banktupcy_dataset %>%
+  select(where(is.numeric)) %>%
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "value") %>%
+  ggplot(aes(x = "", y = value)) +
+  geom_boxplot() +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal()
+```
+
+# Total Assets Distribution
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = total_assets)) +
+  geom_histogram(bins = 50) +
+  scale_x_log10() +
+  theme_minimal()
+```
+
+# Market Value Distribution
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = market_value)) +
+  geom_histogram(bins = 50) +
+  scale_x_log10() +
+  theme_minimal()
+```
+
+# Year vs count of alive and failed companies
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+year_summary <- american_banktupcy_dataset %>%
+  group_by(year, status_label) %>%
+  summarise(count = n(), .groups = "drop")
+
+ggplot(year_summary, aes(x = year, y = count, color = status_label)) +
+  geom_line(size = 1) +
+  geom_point() +
+  labs(title = "Trend of Active vs Bankrupt Firms Over Time",
+       x = "Year",
+       y = "Number of Firms",
+       color = "Company Status") +
+  theme_minimal()
+
+ggplot(year_summary, aes(x = factor(year), y = count, fill = status_label)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Distribution of Firm Status by Year",
+       x = "Year",
+       y = "Number of Firms") +
+  theme_minimal()
+```
+
+## Net Income distributions
+
+```{r}
+
+ggplot(american_banktupcy_dataset, aes(x = total_liabilities,
+                          y = net_income,
+                          color = status_label)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ year) +
+  theme_minimal() +
+  labs(title = "Net Income vs Total Liabilities by Year (Log Scale)",
+       x = "Total Liabilities (log scale)",
+       y = "Net Income (log scale)",
+       color = "Status")
+
+
+```
+
+## Density Plot for total Liabilities by status
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = total_liabilities,
+                          fill = status_label)) +
+  geom_density(alpha = 0.4) +
+  scale_x_log10() +
+  theme_minimal() +
+  labs(title = "Distribution of Total Liabilities by Firm Status",
+       x = "Total Liabilities (log scale)",
+       fill = "Status")
+```
+
+## Density Plot for total net income by status
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = net_income,
+                          fill = status_label)) +
+  geom_density(alpha = 0.4) +
+  scale_x_log10() +
+  theme_minimal() +
+  labs(title = "Distribution of Total net_income by Firm Status",
+       x = "net_income (log scale)",
+       fill = "Status")
+```
+
+## Density Plot for total gross profit by status
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = gross_profit,
+                          fill = status_label)) +
+  geom_density(alpha = 0.4) +
+  scale_x_log10() +
+  theme_minimal() +
+  labs(title = "Distribution of Total gross profit by Firm Status",
+       x = "gross_profit (log scale)",
+       fill = "Status")
+```
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = status_label,
+                          y = total_liabilities,
+                          fill = status_label)) +
+  geom_violin(alpha = 0.6) +
+  scale_y_log10() +
+  theme_minimal() +
+  labs(title = "Total Liabilities by Firm Status")
+```
+
+```{r}
+american_banktupcy_dataset$leverage_ratio <- american_banktupcy_dataset$total_liabilities / american_banktupcy_dataset$total_assets
+american_banktupcy_dataset$profit_margin <- american_banktupcy_dataset$net_income / american_banktupcy_dataset$total_revenue
+
+ggplot(american_banktupcy_dataset, aes(x = leverage_ratio,
+                          y = profit_margin,
+                          color = status_label)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Leverage vs Profitability by Firm Status",
+       x = "Leverage Ratio (Liabilities / Assets)",
+       y = "Profit Margin (Net Income / Revenue)")
+```
+
+```{r}
+american_banktupcy_dataset$current_ratio <- american_banktupcy_dataset$current_assets / american_banktupcy_dataset$total_current_liabilities
+
+ggplot(american_banktupcy_dataset, aes(x = total_long_term_debt,
+                          y = current_ratio,
+                          color = status_label)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  theme_minimal() +
+  labs(title = "Debt vs Liquidity by Firm Status",
+       x = "Total Long-Term Debt (log scale)",
+       y = "Current Ratio")
+```
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = total_assets,
+                          y = market_value,
+                          color = status_label)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_minimal() +
+  labs(title = "Market Value vs Total Assets by Firm Status")
+```
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = year,
+                          y = leverage_ratio,
+                          color = status_label)) +
+  geom_jitter(alpha = 0.3) +
+  theme_minimal() +
+  labs(title = "Leverage Ratio Over Time by Firm Status")
+```
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = total_assets,
+                          y = market_value,
+                          color = status_label)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ year) +
+  theme_minimal() +
+  labs(title = "Market Value vs Total Assets by Year",
+       x = "Total Assets (log scale)",
+       y = "Market Value (log scale)",
+       color = "Firm Status")
+```
+
+```{r}
+ggplot(american_banktupcy_dataset %>% filter(year == 2018),
+       aes(x = total_assets,
+           y = market_value,
+           color = status_label)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_minimal() +
+  labs(title = "Market Value vs Total Assets (2018)",
+       x = "Total Assets (log scale)",
+       y = "Market Value (log scale)",
+       color = "Firm Status")
+```
+
+```{r}
+ggplot(american_banktupcy_dataset %>% filter(year == 2008),
+       aes(x = total_assets,
+           y = market_value,
+           color = status_label)) +
+  geom_point(alpha = 0.5) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_minimal() +
+  labs(title = "Market Value vs Total Assets (2008)",
+       x = "Total Assets (log scale)",
+       y = "Market Value (log scale)",
+       color = "Firm Status")
+```
+
+```{r}
+
+ggplot(filter(american_banktupcy_dataset, status_label == "alive"),
+       aes(x = year)) +
+  geom_bar() +
+  theme_minimal() +
+  labs(title = "Active (Alive) Companies by Year",
+       x = "Year",
+       y = "Count of Companies")
+```
+
+```{r}
+ggplot(filter(american_banktupcy_dataset, status_label == "failed"),
+       aes(x = year)) +
+  geom_bar() +
+  theme_minimal() +
+  labs(title = "Bankrupt (Failed) Companies by Year",
+       x = "Year",
+       y = "Count of Companies")
+```
+
+## Unique Companies that failed
+
+```{r}
+first_failure <- american_banktupcy_dataset %>%
+  filter(status_label == "failed") %>%
+  group_by(company_name) %>%
+  summarise(first_bankrupt_year = min(year), .groups = "drop")
+
+ggplot(first_failure, aes(x = first_bankrupt_year)) +
+  geom_bar(fill = "firebrick") +
+  theme_minimal() +
+  labs(title = "First Bankruptcy Event by Year",
+       x = "Year",
+       y = "Number of Companies")
+```
+
+## Unique Companies alive
+
+```{r}
+first_failure <- american_banktupcy_dataset %>%
+  filter(status_label == "alive") %>%
+  group_by(company_name) %>%
+  summarise(first_bankrupt_year = min(year), .groups = "drop")
+
+ggplot(first_failure, aes(x = first_bankrupt_year)) +
+  geom_bar(fill = "green") +
+  theme_minimal() +
+  labs(title = "First alive Event by Year",
+       x = "Year",
+       y = "Number of Companies")
+```
+
+## Splitting Data into training and test
+
+```{r}
+set.seed(123)
+
+df <- american_banktupcy_dataset
+
+# unique companies
+companies <- df %>% distinct(company_name)
+
+# sample 80% of companies into train
+train_companies <- companies %>%
+  sample_frac(0.80)
+
+# split data by those companies
+train_companies_df <- df %>% semi_join(train_companies, by = "company_name")
+test_companies_df  <- df %>% anti_join(train_companies, by = "company_name")
+
+# quick checks
+cat("Train rows:", nrow(train_companies_df), "\n")
+cat("Test rows:", nrow(test_companies_df), "\n")
+cat("Train companies:", n_distinct(train_companies_df$company_name), "\n")
+cat("Test companies:", n_distinct(test_companies_df$company_name), "\n")
+
+# leakage check (should be 0)
+length(intersect(unique(train_companies_df$company_name), unique(test_companies_df$company_name)))
+```
+```{r}
+
+suppressPackageStartupMessages(library(tidyverse))
+
+if (!requireNamespace("eulerr", quietly = TRUE)) install.packages("eulerr")
+library(eulerr)
+
+train_set <- unique(train_companies_df$company_name)
+test_set  <- unique(test_companies_df$company_name)
+
+overlap_n <- length(intersect(train_set, test_set))
+train_n   <- length(train_set)
+test_n    <- length(test_set)
+
+fit <- eulerr::euler(c(
+  "Train" = train_n,
+  "Test"  = test_n,
+  "Train&Test" = overlap_n
+))
+
+plot(
+  fit,
+  fills = c("steelblue2", "orange2"),
+  labels = list(font = 2),
+  quantities = TRUE,
+  main = paste0(
+    "Company-Level Split Overlap Check\n",
+    "Train companies: ", train_n,
+    " | Test companies: ", test_n,
+    " | Overlap: ", overlap_n
+  )
+)
+
+# -------------------------------------------------
+# 2) Company-year heatmap (sample companies)
+# -------------------------------------------------
+set.seed(123)
+
+sample_n_companies <- 15  # increase/decrease for readability on slides
+sample_companies <- sample(unique(american_banktupcy_dataset$company_name),
+                           size = sample_n_companies)
+
+split_map <- tibble(
+  company_name = c(train_set, test_set),
+  split = c(rep("Train", length(train_set)), rep("Test", length(test_set)))
+)
+
+plot_df <- american_banktupcy_dataset %>%
+  filter(company_name %in% sample_companies) %>%
+  left_join(split_map, by = "company_name") %>%
+  mutate(
+    split = factor(split, levels = c("Train", "Test")),
+    company_name = forcats::fct_reorder(company_name, year, .fun = min)
+  )
+
+ggplot(plot_df, aes(x = year, y = company_name, fill = split)) +
+  geom_tile(color = "white", linewidth = 0.2) +
+  labs(
+    title = "Leakage-Safe Split Visualization (Sample Companies)",
+    subtitle = paste0(
+      "Each company belongs to ONLY one set. Company overlap = ", overlap_n,
+      " (expected: 0)"
+    ),
+    x = "Year",
+    y = "Company (sample)",
+    fill = "Dataset"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(panel.grid = element_blank())
+```
+
+
+
+## Transformation and scaling
+
+```{r}
+library(caret)
+
+# keep IDs/outcome out of scaling
+id_cols <- c("company_name", "status_label", "year")
+
+numeric_cols <- names(train_companies_df)[sapply(train_companies_df, is.numeric)]
+numeric_cols <- setdiff(numeric_cols, "year")  # don't scale year unless you want to
+
+# Fit scaler on TRAIN only
+pp <- preProcess(train_companies_df[, numeric_cols], method = c("center", "scale"))
+
+# Apply to train and test
+train_scaled <- train_companies_df
+test_scaled  <- test_companies_df
+
+train_scaled[, numeric_cols] <- predict(pp, train_companies_df[, numeric_cols])
+test_scaled[, numeric_cols]  <- predict(pp, test_companies_df[, numeric_cols])
+
+# sanity check
+summary(train_scaled[, numeric_cols])
+```
+
+```{r}
+ggplot(american_banktupcy_dataset, aes(x = gross_profit,
+                          y = total_current_liabilities,
+                          color = status_label)) +
+  geom_jitter(alpha = 0.3) +
+  theme_minimal() +
+  labs(title = "Leverage Ratio Over Time by Firm Status")
+```
+
+
+
+## FEATURE ENGINEERING
+
+# PROFITABILITY Ratio
+
+```{r}
+library(dplyr)
+
+add_features <- function(df) {
+  df %>%
+    arrange(company_name, year) %>%
+    group_by(company_name) %>%
+    mutate(
+      # Growth features (within company; computed only within this split)
+      revenue_growth = (total_revenue - lag(total_revenue)) / lag(total_revenue),
+      asset_growth   = (total_assets  - lag(total_assets))  / lag(total_assets),
+      income_growth  = (net_income    - lag(net_income))    / lag(net_income),
+
+      # Company-level features (computed within this split only)
+      years_observed = n(),
+      years_alive    = sum(status_label == "alive"),
+
+      # “Eventually bankrupt” indicator (within this split only)
+      eventually_bankrupt = ifelse(any(status_label == "failed"), 1, 0),
+
+      # Survival window features (within this split only)
+      first_year     = min(year),
+      last_year      = max(year),
+      survival_years = last_year - first_year + 1
+    ) %>%
+    ungroup() %>%
+    mutate(
+      # Profitability ratios (row-level; safe)
+      profit_margin = ifelse(total_revenue == 0, NA, net_income / total_revenue),
+      ebit_margin   = ifelse(total_revenue == 0, NA, ebit / total_revenue),
+      ebitda_margin = ifelse(total_revenue == 0, NA, ebitda / total_revenue),
+      gross_margin  = ifelse(total_revenue == 0, NA, gross_profit / total_revenue),
+
+      # Leverage ratios (row-level; safe)
+      leverage_ratio       = ifelse(total_assets == 0, NA, total_liabilities / total_assets),
+      long_term_debt_ratio = ifelse(total_assets == 0, NA, total_long_term_debt / total_assets),
+      debt_to_revenue      = ifelse(total_revenue == 0, NA, total_liabilities / total_revenue),
+
+      # Working capital + flag (row-level; safe)
+      working_capital = current_assets - total_current_liabilities,
+      negative_income_flag = ifelse(net_income < 0, 1, 0)
+    )
+}
+```
+
+## Add Features to training and test
+
+```{r}
+train_companies_df <- add_features(train_companies_df)
+test_companies_df  <- add_features(test_companies_df)
+```
+
+#Verify existance
+
+```{r}
+new_cols <- c(
+  "profit_margin","ebit_margin","ebitda_margin","gross_margin",
+  "leverage_ratio","long_term_debt_ratio","debt_to_revenue",
+  "revenue_growth","asset_growth","income_growth",
+  "working_capital","negative_income_flag",
+  "years_observed","years_alive","eventually_bankrupt",
+  "first_year","last_year","survival_years"
+)
+
+all(new_cols %in% names(train_companies_df))
+all(new_cols %in% names(test_companies_df))
+```
+
+#No Overlap checks
+
+```{r}
+length(intersect(unique(train_companies_df$company_name),
+                 unique(test_companies_df$company_name)))
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+engineered_table <- tibble(
+  Category = c(
+    rep("Growth Features", 3),
+    rep("Company-Level Features", 5),
+    rep("Profitability Ratios", 4),
+    rep("Leverage Ratios", 3),
+    rep("Liquidity / Flags", 2)
+  ),
+  Engineered_Variable = c(
+    "revenue_growth",
+    "asset_growth",
+    "income_growth",
+    
+    "years_observed",
+    "years_alive",
+    "eventually_bankrupt",
+    "first_year",
+    "survival_years",
+    
+    "profit_margin",
+    "ebit_margin",
+    "ebitda_margin",
+    "gross_margin",
+    
+    "leverage_ratio",
+    "long_term_debt_ratio",
+    "debt_to_revenue",
+    
+    "working_capital",
+    "negative_income_flag"
+  )
+)
+
+engineered_table %>%
+  kable(caption = "Engineered Variables Created for Clustering Analysis") %>%
+  kable_styling(full_width = FALSE)
+```
+
+## Add Features to training and test
+
+```{r}
+train_companies_df <- add_features(train_companies_df)
+test_companies_df  <- add_features(test_companies_df)
+```
+
+## Transformation and Scaling 
+```{r}
+
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(caret)
+})
+
+id_cols <- c("company_name", "status_label")
+numeric_cols <- train_companies_df %>%
+  select(-all_of(id_cols)) %>%
+  select(where(is.numeric)) %>%
+  names()
+
+# OPTIONAL: if you do NOT want to scale "year", remove it:
+numeric_cols <- setdiff(numeric_cols, "year")
+
+# 2) Fit preprocessing on training data only
+# Choose methods:
+# - center, scale = standardization
+# - (optional) YeoJohnson handles skew and negatives safely
+pp <- preProcess(
+  train_companies_df[, numeric_cols],
+  method = c("center", "scale")  # add "YeoJohnson" if you want power transform
+  # method = c("YeoJohnson", "center", "scale")
+)
+
+# 3) Apply to train/test
+train_scaled_numeric <- predict(pp, train_companies_df[, numeric_cols])
+test_scaled_numeric  <- predict(pp, test_companies_df[, numeric_cols])
+
+# 4) Rebuild scaled dataframes while keeping id + target columns
+train_companies_scaled_df <- train_companies_df %>%
+  select(all_of(id_cols)) %>%
+  bind_cols(train_scaled_numeric)
+
+test_companies_scaled_df <- test_companies_df %>%
+  select(all_of(id_cols)) %>%
+  bind_cols(test_scaled_numeric)
+
+# 5) Quick validation checks
+cat("Scaled train dimensions:", dim(train_companies_scaled_df), "\n")
+cat("Scaled test dimensions:", dim(test_companies_scaled_df), "\n")
+
+# Means should be ~0 and sds ~1 in TRAIN
+train_means <- sapply(train_companies_scaled_df[, numeric_cols], mean, na.rm = TRUE)
+train_sds   <- sapply(train_companies_scaled_df[, numeric_cols], sd, na.rm = TRUE)
+
+cat("Train mean range (should be near 0):", range(train_means), "\n")
+cat("Train sd range (should be near 1):", range(train_sds), "\n")
+```
+
+
+## Build a 2-means cluster model (k=2) and interpret the results.
+
+```{r}
+# Load packages
+suppressPackageStartupMessages(library(tidyverse))
+
+# Increase font size for ggplot2
+theme_set(theme_gray(base_size = 18))
+
+
+colors <- c("#1f77b4","#ff7f0e", "#2ca02c", "#d62728",
+            "#9467bd","#8c564b", "#e377c2", "#7f7f7f",
+            "#bcbd22", "#17becf")
+
+
+cluster_vars <- c("leverage_ratio", "profit_margin")
+
+clust_df <- train_companies_df %>%
+  select(all_of(cluster_vars)) %>%
+  drop_na()  # kmeans cannot handle NA
+
+head(clust_df)
+
+# OPTIONAL but recommended: cap extreme leverage (financial data can have huge outliers)
+# Comment out if you don't want winsorization.
+cap <- function(x, p = 0.01) {
+  q <- quantile(x, probs = c(p, 1 - p), na.rm = TRUE)
+  pmin(pmax(x, q[1]), q[2])
+}
+
+clust_df <- clust_df %>%
+  mutate(
+    leverage_ratio = cap(leverage_ratio, p = 0.01),
+    profit_margin  = cap(profit_margin,  p = 0.01)
+  )
+
+# Scale (required for k-means distance)
+clust_scaled <- scale(clust_df)
+
+
+set.seed(123)
+kmModel <- kmeans(clust_scaled, centers = 2, nstart = 25)
+kmModel
+
+# Add cluster assignments
+clust_df$cluster <- as.factor(kmModel$cluster)
+head(clust_df)
+
+
+kmCenters_scaled <- as.data.frame(kmModel$centers)
+
+scale_center <- attr(clust_scaled, "scaled:center")
+scale_scale  <- attr(clust_scaled, "scaled:scale")
+
+kmCenters <- sweep(kmCenters_scaled, 2, scale_scale, "*")
+kmCenters <- sweep(kmCenters, 2, scale_center, "+")
+
+colnames(kmCenters) <- cluster_vars
+
+
+clust_df |>
+  ggplot(aes(x = leverage_ratio, y = profit_margin)) +
+  geom_point(aes(color = cluster, shape = cluster), cex = 4, alpha = 0.6) +
+  geom_point(data = kmCenters,
+             aes(x = leverage_ratio, y = profit_margin),
+             color = "black", cex = 10, shape = 18) +
+  labs(
+    title = "k-means Clustering (k=2): Leverage vs Profitability",
+    x = "Leverage Ratio (Total Liabilities / Total Assets)",
+    y = "Profit Margin (Net Income / Total Revenue)"
+  ) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = colors)
+
+
+clust_df %>%
+  group_by(cluster) %>%
+  summarise(
+    leverage_mean = mean(leverage_ratio, na.rm = TRUE),
+    leverage_sd   = sd(leverage_ratio, na.rm = TRUE),
+    profit_mean   = mean(profit_margin, na.rm = TRUE),
+    profit_sd     = sd(profit_margin, na.rm = TRUE),
+    n = n()
+  )
+
+
+status_compare <- train_companies_df %>%
+  select(all_of(cluster_vars), status_label) %>%
+  drop_na() %>%
+  mutate(
+    leverage_ratio = cap(leverage_ratio, p = 0.01),
+    profit_margin  = cap(profit_margin,  p = 0.01)
+  )
+
+# Attach cluster labels (same rows used for clustering)
+status_compare$cluster <- clust_df$cluster
+
+table(status_compare$cluster, status_compare$status_label)
+
+
+set.seed(123)
+WCSS <- sapply(1:5, function(k) kmeans(clust_scaled, k, nstart = 25)$tot.withinss)
+WCSS
+
+ggplot() +
+  geom_point(aes(x = 1:5, y = WCSS), cex = 4) +
+  geom_line(aes(x = 1:5, y = WCSS)) +
+  labs(x = "Number of clusters (k)",
+       y = "Within-cluster sum of squares (WCSS)")
+```
+## Apply Kmeans to Test
+
+```{r}
+# ---- Apply TRAIN k-means model to TEST data ----
+
+cluster_vars <- c("leverage_ratio", "profit_margin")
+
+# 1) Prep test data (same steps as train: select vars, drop NA, cap outliers)
+test_clust_df <- test_companies_df %>%
+  select(all_of(cluster_vars)) %>%
+  drop_na() %>%
+  mutate(
+    leverage_ratio = cap(leverage_ratio, p = 0.01),
+    profit_margin  = cap(profit_margin,  p = 0.01)
+  )
+
+# 2) Scale test using TRAIN center/scale (NO leakage)
+test_scaled <- scale(test_clust_df, center = scale_center, scale = scale_scale)
+
+# 3) Assign each test point to the nearest TRAIN cluster center (in scaled space)
+# kmModel$centers are already in scaled space
+assign_cluster <- function(X_scaled, centers_scaled) {
+  # returns vector of cluster ids (1..k)
+  apply(X_scaled, 1, function(x) {
+    d <- apply(centers_scaled, 1, function(cntr) sum((x - cntr)^2))
+    which.min(d)
+  })
+}
+
+test_cluster_id <- assign_cluster(test_scaled, kmModel$centers)
+
+# 4) Add cluster labels back to test dataframe
+test_clust_df$cluster <- factor(test_cluster_id)
+
+# If you want clusters attached to the full Test_companies_df (with NAs preserved),
+# create a new column and fill only the rows that were used (complete cases on cluster_vars)
+test_companies_df$cluster <- NA
+
+test_rows_used <- complete.cases(test_companies_df[, cluster_vars])
+# but we also dropped NA then capped; this matches complete.cases
+test_companies_df$cluster[test_rows_used] <- as.character(test_clust_df$cluster)
+
+# quick check
+table(test_companies_df$cluster, useNA = "ifany")
+
+plot_train <- clust_df %>% mutate(dataset = "Train")
+plot_test  <- test_clust_df %>% mutate(dataset = "Test")
+
+bind_rows(plot_train, plot_test) |>
+  ggplot(aes(x = leverage_ratio, y = profit_margin)) +
+  geom_point(aes(color = cluster, shape = dataset), cex = 4, alpha = 0.6) +
+  geom_point(data = kmCenters,
+             aes(x = leverage_ratio, y = profit_margin),
+             color = "black", cex = 10, shape = 18) +
+  labs(
+    title = "Train vs Test: k-means Clusters (Train Fit, Test Assigned)",
+    x = "Leverage Ratio",
+    y = "Profit Margin"
+  ) +
+  scale_color_manual(values = colors)
+```
+```{r}
+clust_df <- train_companies_df %>%
+  select(all_of(cluster_vars), status_label) %>%
+  drop_na() %>%
+  mutate(
+    leverage_ratio = cap(leverage_ratio, p = 0.01),
+    profit_margin  = cap(profit_margin,  p = 0.01),
+    status_label = factor(status_label)
+  )
+```
+
+
+
+```{r}
+cluster_vars <- c("leverage_ratio", "profit_margin")
+
+# --- TRAIN (include year + status_label) ---
+clust_df <- train_companies_df %>%
+  select(all_of(cluster_vars), status_label, year) %>%
+  drop_na() %>%
+  mutate(
+    leverage_ratio = cap(leverage_ratio, p = 0.01),
+    profit_margin  = cap(profit_margin,  p = 0.01),
+    status_label   = factor(status_label),
+    year           = as.integer(year)
+  )
+
+# --- TEST (include year + status_label) ---
+test_clust_df <- test_companies_df %>%
+  select(all_of(cluster_vars), status_label, year) %>%
+  drop_na() %>%
+  mutate(
+    leverage_ratio = cap(leverage_ratio, p = 0.01),
+    profit_margin  = cap(profit_margin,  p = 0.01),
+    status_label   = factor(status_label),
+    year           = as.integer(year)
+  )
+
+# Apply TRAIN scaling to TEST (no leakage)
+test_scaled <- scale(test_clust_df[, cluster_vars], center = scale_center, scale = scale_scale)
+
+assign_cluster <- function(X_scaled, centers_scaled) {
+  apply(X_scaled, 1, function(x) {
+    d <- apply(centers_scaled, 1, function(cntr) sum((x - cntr)^2))
+    which.min(d)
+  })
+}
+
+test_clust_df$cluster <- factor(assign_cluster(test_scaled, kmModel$centers))
+
+plot_train <- clust_df %>% mutate(dataset = "Train")
+plot_test  <- test_clust_df %>% mutate(dataset = "Test")
+combined_plot_data <- bind_rows(plot_train, plot_test)
+
+# ---- CHOOSE YEAR HERE ----
+year_to_plot <- 2018
+
+plot_year <- combined_plot_data %>% filter(year == year_to_plot)
+
+p <- ggplot(plot_year, aes(x = leverage_ratio, y = profit_margin)) +
+  geom_point(aes(color = cluster, shape = dataset), size = 3.2, alpha = 0.6) +
+  geom_point(
+    data = plot_year %>% filter(status_label == "Failed"),
+    aes(x = leverage_ratio, y = profit_margin),
+    shape = 21, stroke = 1.1, color = "black", fill = NA, size = 3.2
+  ) +
+  geom_point(
+    data = kmCenters,
+    aes(x = leverage_ratio, y = profit_margin),
+    color = "black", size = 6, shape = 18
+  ) +
+  labs(
+    title = paste0("Train vs Test: k-means Clusters (Year ", year_to_plot, ")"),
+    x = "Leverage Ratio",
+    y = "Profit Margin",
+    color = "Cluster",
+    shape = "Dataset"
+  ) +
+  scale_color_manual(values = colors) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(t = 10, r = 60, b = 10, l = 10),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+p
+```
+
+
+
+```{r}
+# ---- Visualize TEST clusters ----
+test_clust_df |>
+  ggplot(aes(x = leverage_ratio, y = profit_margin)) +
+  geom_point(aes(color = cluster, shape = cluster), cex = 4, alpha = 0.6) +
+  # show TRAIN centers (same centers learned from train)
+  geom_point(data = kmCenters,
+             aes(x = leverage_ratio, y = profit_margin),
+             color = "black", cex = 10, shape = 18) +
+  labs(
+    title = "TEST Set: Assigned k-means Clusters (k=2)",
+    x = "Leverage Ratio (Total Liabilities / Total Assets)",
+    y = "Profit Margin (Net Income / Total Revenue)"
+  ) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = colors)
+```
+
+
+# Cluster Kmeans
+```{r}
+library(dplyr)
+
+# Choose clustering variables
+cluster_vars <- c(
+  "leverage_ratio",
+  "long_term_debt_ratio",
+  "profit_margin",
+  "ebitda_margin",
+  "debt_to_revenue",
+  "working_capital"
+)
+
+# Remove rows with NA in clustering variables
+train_cluster_data <- train_companies_scaled_df %>%
+  select(all_of(cluster_vars)) %>%
+  na.omit()
+
+set.seed(123)
+
+k2_model <- kmeans(train_cluster_data, centers = 2, nstart = 25)
+
+# Attach clusters back to train dataframe
+train_companies_scaled_df$cluster <- NA
+train_companies_scaled_df$cluster[complete.cases(train_companies_scaled_df[, cluster_vars])] <- k2_model$cluster
+
+table(train_companies_scaled_df$cluster)
+# Function to assign nearest centroid
+assign_cluster <- function(data, centers) {
+  as.numeric(apply(data, 1, function(row) {
+    which.min(colSums((t(centers) - row)^2))
+  }))
+}
+
+# Prepare test data
+test_cluster_data <- test_companies_scaled_df %>%
+  select(all_of(cluster_vars))
+
+# Assign clusters
+test_companies_scaled_df$cluster <- assign_cluster(
+  as.matrix(test_cluster_data),
+  k2_model$centers
+)
+
+table(test_companies_scaled_df$cluster)
+library(ggplot2)
+
+ggplot(train_companies_scaled_df,
+       aes(x = leverage_ratio,
+           y = profit_margin,
+           color = factor(cluster))) +
+  geom_point(alpha = 0.4) +
+  labs(
+    title = "K-Means Clustering (k = 2) on Scaled Financial Structure",
+    x = "Leverage Ratio (Scaled)",
+    y = "Profit Margin (Scaled)",
+    color = "Cluster"
+  ) +
+  theme_minimal(base_size = 14)
+```
+```{r}
+table(train_companies_scaled_df$cluster,
+      train_companies_scaled_df$status_label)
+
+prop.table(
+  table(train_companies_scaled_df$cluster,
+        train_companies_scaled_df$status_label),
+  margin = 1
+)
+```
+
+
+# Cluster Revenue and operating expenses
+
+```{r}
+
+
+suppressPackageStartupMessages(library(tidyverse))
+
+theme_set(theme_gray(base_size = 18))
+
+colors <- c("#1f77b4","#ff7f0e", "#2ca02c", "#d62728",
+            "#9467bd","#8c564b", "#e377c2", "#7f7f7f",
+            "#bcbd22", "#17becf")
+
+
+cluster_vars <- c("total_revenue", "total_operating_expenses")
+
+clust_df <- train_companies_df %>%
+  select(all_of(cluster_vars)) %>%
+  drop_na()  # kmeans cannot handle NA
+
+head(clust_df)
+
+
+clust_scaled <- scale(clust_df)
+
+
+set.seed(123)
+kmModel <- kmeans(clust_scaled, centers = 2, nstart = 25)
+kmModel
+
+# Add cluster assignments
+clust_df$cluster <- as.factor(kmModel$cluster)
+head(clust_df)
+
+
+kmCenters_scaled <- as.data.frame(kmModel$centers)
+
+scale_center <- attr(clust_scaled, "scaled:center")
+scale_scale  <- attr(clust_scaled, "scaled:scale")
+
+kmCenters <- sweep(kmCenters_scaled, 2, scale_scale, "*")
+kmCenters <- sweep(kmCenters, 2, scale_center, "+")
+
+colnames(kmCenters) <- cluster_vars
+
+
+clust_df |>
+  ggplot(aes(x = total_revenue, y = total_operating_expenses)) +
+  geom_point(aes(color = cluster, shape = cluster), cex = 4, alpha = 0.6) +
+  geom_point(data = kmCenters,
+             aes(x = total_revenue, y = total_operating_expenses),
+             color = "black", cex = 10, shape = 18) +
+  labs(
+    title = "k-means Clustering (k=2): Revenue vs Operating Expenses",
+    x = "Total Revenue",
+    y = "Total Operating Expenses"
+  ) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = colors)
+
+
+clust_df %>%
+  group_by(cluster) %>%
+  summarise(
+    revenue_mean  = mean(total_revenue),
+    revenue_sd    = sd(total_revenue),
+    expense_mean  = mean(total_operating_expenses),
+    expense_sd    = sd(total_operating_expenses),
+    n = n()
+  )
+
+
+status_compare <- train_companies_df %>%
+  select(all_of(cluster_vars), status_label) %>%
+  drop_na()
+
+# Attach cluster labels (same rows used for clustering)
+status_compare$cluster <- clust_df$cluster
+
+table(status_compare$cluster, status_compare$status_label)
+
+
+set.seed(123)
+WCSS <- sapply(1:5, function(k) kmeans(clust_scaled, k, nstart = 25)$tot.withinss)
+WCSS
+
+ggplot() +
+  geom_point(aes(x = 1:5, y = WCSS), cex = 4) +
+  geom_line(aes(x = 1:5, y = WCSS)) +
+  labs(x = "Number of clusters (k)",
+       y = "Within-cluster sum of squares (WCSS)")
+```
+
+```{r}
+prop.table(
+  table(status_compare$cluster,
+        status_compare$status_label),
+  margin = 1
+)
+```
+
+## Confusion Matrix
+
+```{r}
+
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(caret))
+
+set.seed(123)
+
+
+pos_class <- "failed"  # positive class
+cluster_vars <- c("leverage_ratio", "profit_margin")  # your chosen pair
+
+
+# 1) Prepare TRAIN data for k-means (drop NA, keep only vars)
+
+train_km <- train_companies_df %>%
+  mutate(status_label = stringr::str_trim(stringr::str_to_lower(status_label))) %>%
+  select(all_of(cluster_vars), status_label) %>%
+  drop_na()
+
+X_train <- train_km %>%
+  select(all_of(cluster_vars))
+
+# Scale using TRAIN statistics ONLY (no leakage)
+train_center <- colMeans(X_train)
+train_scale  <- apply(X_train, 2, sd)
+
+X_train_scaled <- scale(X_train, center = train_center, scale = train_scale)
+
+# Fit k-means (k=2)
+kmModel <- kmeans(X_train_scaled, centers = 2, nstart = 25)
+
+# Add cluster labels back to TRAIN rows used
+train_km$cluster <- kmModel$cluster
+
+
+# 2) Map cluster 
+
+cluster_rates <- train_km %>%
+  group_by(cluster) %>%
+  summarise(
+    n = n(),
+    failed_rate = mean(status_label == pos_class),
+    .groups = "drop"
+  )
+
+# Cluster with highest failed_rate becomes "failed"
+failed_cluster <- cluster_rates %>%
+  slice_max(failed_rate, n = 1, with_ties = FALSE) %>%
+  pull(cluster)
+
+cluster_map <- tibble(
+  cluster = sort(unique(train_km$cluster)),
+  predicted_label = ifelse(cluster == failed_cluster, "failed", "alive")
+)
+
+cluster_map
+
+# This table tells you, e.g. cluster 1 -> "alive", cluster 2 -> "failed" (or vice versa)
+
+
+# 3) Prepare TEST data (same vars), scale with TRAIN params, assign nearest centroid
+
+test_km <- test_companies_df %>%
+  mutate(status_label = stringr::str_trim(stringr::str_to_lower(status_label))) %>%
+  select(all_of(cluster_vars), status_label) %>%
+  drop_na()
+
+X_test <- test_km %>%
+  select(all_of(cluster_vars))
+
+X_test_scaled <- scale(X_test, center = train_center, scale = train_scale)
+
+# Centroids from kmeans are in SCALED space
+centers <- kmModel$centers  # 2 x p matrix
+
+# Assign each test row to nearest centroid (Euclidean distance)
+assign_cluster <- function(X, centers_mat) {
+  # X: matrix n x p
+  # centers_mat: k x p
+  dists <- sapply(1:nrow(centers_mat), function(k) {
+    rowSums((X - matrix(centers_mat[k, ], nrow = nrow(X), ncol = ncol(X), byrow = TRUE))^2)
+  })
+  max.col(-dists)  # returns index of smallest distance
+}
+
+test_clusters <- assign_cluster(as.matrix(X_test_scaled), centers)
+test_km$cluster <- test_clusters
+
+# Attach predicted label using mapping from TRAIN
+test_pred <- test_km %>%
+  left_join(cluster_map, by = "cluster") %>%
+  mutate(
+    status_label = factor(status_label, levels = c("alive", "failed")),
+    predicted_label = factor(predicted_label, levels = c("alive", "failed"))
+  )
+
+
+# 4) Confusion matrix + metrics on TEST
+
+conf_matrix <- table(
+  Actual = test_pred$status_label,
+  Predicted = test_pred$predicted_label
+)
+conf_matrix
+
+TN <- conf_matrix["alive", "alive"]
+FP <- conf_matrix["alive", "failed"]
+FN <- conf_matrix["failed", "alive"]
+TP <- conf_matrix["failed", "failed"]
+
+accuracy  <- (TP + TN) / sum(conf_matrix)
+precision <- ifelse((TP + FP) == 0, NA, TP / (TP + FP))      # PPV
+recall    <- ifelse((TP + FN) == 0, NA, TP / (TP + FN))      # Sensitivity
+f1        <- ifelse(is.na(precision) | is.na(recall) | (precision + recall) == 0,
+                    NA,
+                    2 * (precision * recall) / (precision + recall))
+
+metrics <- tibble(
+  Metric = c("Accuracy", "Precision (PPV)", "Recall (Sensitivity)", "F1-score"),
+  Value  = c(accuracy, precision, recall, f1)
+)
+metrics
+
+# caret output (nice for reporting)
+cm <- confusionMatrix(
+  data = test_pred$predicted_label,
+  reference = test_pred$status_label,
+  positive = pos_class
+)
+cm
+```
+
+```{r}
+write.csv(test_companies_df, "test_companies_df.csv", row.names = FALSE)
+write.csv(train_companies_df, "train_companies_df.csv", row.names = FALSE)
+```
