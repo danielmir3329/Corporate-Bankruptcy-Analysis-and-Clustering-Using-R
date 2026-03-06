@@ -1,7 +1,7 @@
 # 📉 Corporate Bankruptcy Analysis and Clustering Using R
 
 ## Project Overview
-
+ 
 This project analyzes financial data from corporations to identify patterns associated with business failure and bankruptcy. Using statistical analysis and machine learning techniques in R, the project explores financial indicators such as leverage ratios, profitability, and other financial metrics to understand how companies differ between those that remain operational and those that fail.
 
 The analysis applies exploratory data analysis, feature engineering, and clustering techniques to segment companies into groups based on financial characteristics. The goal is to detect underlying patterns that may help identify companies at higher risk of bankruptcy.
